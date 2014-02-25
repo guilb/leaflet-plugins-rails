@@ -161,3 +161,156 @@ L.UrlUtil = {
 		return L.Util.getParamString(p).slice(1);
 	}
 };
+
+L.Control.Permalink.include({
+	/*
+	options: {
+		line: null
+	},
+	*/
+
+	initialize_line: function() {
+		this.on('update', this._set_line, this);
+		this.on('add', this._onadd_line, this);
+	},
+
+	_onadd_line: function(e) {
+		//console.info("onAdd::line", e);
+		if (!this.options.line) return;
+		this.options.line.on('edit', this._update_line, this);
+		this._update_line()
+	},
+
+	_update_line: function() {
+		if (!this.options.line) return;
+		var line = this.options.line;
+		if (!line) return;
+		var text = [], coords = line.getLatLngs();
+		if (!coords.length)
+			return this._update({line: null});
+		for (var i in coords)
+			text.push(coords[i].lat.toFixed(4) + "," + coords[i].lng.toFixed(4))
+		this._update({line: text.join(';')});
+	},
+
+	_set_line: function(e) {
+		//console.info("Set line", e.params.line);
+		var p = e.params, l = this.options.line;
+		if (!l || !p.line) return;
+		var coords = [], text = p.line.split(';');
+		for (var i in text) {
+			var ll = text[i].split(',');
+			if (ll.length != 2) continue;
+			coords.push(new L.LatLng(ll[0], ll[1]));
+		}
+		if (!coords.length) return;
+		l.setLatLngs(coords);
+		if (!this._map.hasLayer(l))
+			this._map.addLayer(l);
+	}
+});
+
+
+L.Control.Permalink.include({
+	/*
+	options: {
+		useMarker: true,
+		markerOptions: {}
+	},
+	*/
+
+	initialize_layer: function() {
+		//console.info("Initialize layer");
+		this.on('update', this._set_layer, this);
+		this.on('add', this._onadd_layer, this);
+	},
+
+	_onadd_layer: function(e) {
+		//console.info("onAdd::layer", e);
+		this._map.on('layeradd', this._update_layer, this);
+		this._map.on('layerremove', this._update_layer, this);
+		this._update_layer();
+	},
+
+	_update_layer: function() {
+		if (!this.options.layers) return;
+		//console.info(this.options.layers);
+		var layer = this.options.layers.currentBaseLayer();
+		if (layer)
+			this._update({layer: layer.name});
+	},
+
+	_set_layer: function(e) {
+		//console.info("Set layer", e);
+		var p = e.params;
+		if (!this.options.layers || !p.layer) return;
+		this.options.layers.chooseBaseLayer(p.layer);
+	}
+});
+
+L.Control.Layers.include({
+	chooseBaseLayer: function(name) {
+		var layer, obj;
+		for (var i in this._layers) {
+			if (!this._layers.hasOwnProperty(i))
+				continue;
+			obj = this._layers[i];
+			if (!obj.overlay && obj.name == name)
+				layer = obj.layer;
+		}
+		if (!layer || this._map.hasLayer(layer))
+			return;
+
+		for (var i in this._layers) {
+			if (!this._layers.hasOwnProperty(i))
+				continue;
+			obj = this._layers[i];
+			if (!obj.overlay && this._map.hasLayer(obj.layer))
+				this._map.removeLayer(obj.layer)
+		}
+		this._map.addLayer(layer)
+		this._update();
+	},
+
+	currentBaseLayer: function() {
+		for (var i in this._layers) {
+			if (!this._layers.hasOwnProperty(i))
+				continue;
+			var obj = this._layers[i];
+			//console.info("Layer: ", obj.name, obj);
+			if (obj.overlay) continue;
+			if (!obj.overlay && this._map.hasLayer(obj.layer))
+				return obj;
+		}
+	}
+});
+
+L.Control.Permalink.include({
+	/*
+	options: {
+		useMarker: true,
+		markerOptions: {}
+	},
+	*/
+
+	initialize_marker: function() {
+		//console.info("Initialize marker");
+		this.on('update', this._set_marker, this);
+	},
+
+	_set_marker: function(e) {
+		//console.info("Set marker", e);
+		var p = e.params;
+		//if (!this.options.useMarker) return;
+		if (this._marker) return;
+		if (p.marker != 1) return;
+		if (p.mlat !== undefined && p.mlon !== undefined)
+			return this._update({mlat: null, mlon: null,
+					lat: p.mlat, lon: p.mlon, marker: 1});
+		this._marker = new L.Marker(new L.LatLng(p.lat, p.lon),
+						this.options.markerOptions);
+		this._marker.bindPopup("<a href='" + this._update_href() + "'>" + this.options.text + "</a>");
+		this._map.addLayer(this._marker);
+		this._update({marker: null});
+	}
+});
