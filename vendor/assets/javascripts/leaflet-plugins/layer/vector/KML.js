@@ -58,6 +58,7 @@ L.Util.extend(L.KML, {
 
 	parseKML: function (xml) {
 		var style = this.parseStyle(xml);
+		this.parseStyleMap(xml, style);
 		var el = xml.getElementsByTagName("Folder");
 		var layers = [], l;
 		for (var i = 0; i < el.length; i++) {
@@ -108,7 +109,7 @@ L.Util.extend(L.KML, {
 					var value = e.childNodes[0].nodeValue;
 					if (key === 'color') {
 						options.opacity = parseInt(value.substring(0, 2), 16) / 255.0;
-						options.color = "#" + value.substring(2, 8);
+						options.color = "#" + value.substring(6, 8) + value.substring(4, 6) + value.substring(2, 4);
 					} else if (key === 'width') {
 						options.weight = value;
 					} else if (key === 'Icon') {
@@ -145,6 +146,27 @@ L.Util.extend(L.KML, {
 			style['#' + e.getAttribute('id')] = options;
 		}
 		return style;
+	},
+	
+	parseStyleMap: function (xml, existingStyles) {
+		var sl = xml.getElementsByTagName("StyleMap");
+		
+		for (var i = 0; i < sl.length; i++) {
+			var e = sl[i], el;
+			var smKey, smStyleUrl;
+			
+			el = e.getElementsByTagName("key");
+			if (el && el[0]) { smKey = el[0].textContent; }
+			el = e.getElementsByTagName("styleUrl");
+			if (el && el[0]) { smStyleUrl = el[0].textContent; }
+			
+			if (smKey=='normal')
+			{
+				existingStyles['#' + e.getAttribute('id')] = existingStyles[smStyleUrl];
+			}
+		}
+		
+		return;
 	},
 
 	parseFolder: function (xml, style) {
@@ -206,7 +228,7 @@ L.Util.extend(L.KML, {
 
 		var name, descr = "";
 		el = place.getElementsByTagName('name');
-		if (el.length) {
+		if (el.length && el[0].childNodes.length) {
 			name = el[0].childNodes[0].nodeValue;
 		}
 		el = place.getElementsByTagName('description');
@@ -275,7 +297,7 @@ L.Util.extend(L.KML, {
 		var el = xml.getElementsByTagName('coordinates');
 		var coords = [];
 		for (var j = 0; j < el.length; j++) {
-			// text might span many childnodes
+			// text might span many childNodes
 			coords = coords.concat(this._read_coords(el[j]));
 		}
 		return coords;
@@ -304,8 +326,7 @@ L.KMLIcon = L.Icon.extend({
 	createIcon: function () {
 		var img = this._createIcon('icon');
 		img.onload = function () {
-			var i = new Image();
-			i.src = this.src;
+			var i = img;
 			this.style.width = i.width + 'px';
 			this.style.height = i.height + 'px';
 
